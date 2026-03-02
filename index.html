@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Hệ Thống Kiểm Kê Sách — Kiểm Kê Thư Viện</title>
+    <title>LibCheck Pro — Kiểm Kê Thư Viện</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
     <link id="heading-font-link" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -49,45 +49,34 @@
             --shadow-custom: 0 4px 16px -2px rgba(15,23,42,0.08), 0 2px 4px -1px rgba(15,23,42,0.04);
             --shadow-custom-hover: 0 10px 24px -4px rgba(15,23,42,0.12), 0 4px 8px -2px rgba(15,23,42,0.06);
         }
-
         * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
-
         ::-webkit-scrollbar { width: 5px; height: 5px; }
         ::-webkit-scrollbar-track { background: #f1f5f9; }
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
-
         input[type=number]::-webkit-inner-spin-button,
         input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
         input[type=number] { -moz-appearance: textfield; }
-
         .fade-in { animation: fadeIn 0.35s cubic-bezier(.16,1,.3,1); }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
-
         .progress-bar { transition: width 0.6s cubic-bezier(.16,1,.3,1); }
-
         .toast { animation: toastIn 0.35s cubic-bezier(.16,1,.3,1), toastOut 0.3s ease 2.7s forwards; }
         @keyframes toastIn  { from { transform: translateX(110%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
         @keyframes toastOut { from { opacity: 1; } to { opacity: 0; transform: translateY(-6px); } }
-
         .drag-over { border-color: #3b82f6 !important; background-color: #eff6ff !important; }
-
         .book-card { transition: box-shadow 0.2s ease, transform 0.15s ease; }
         .book-card:active { transform: scale(0.99); }
-
         .qty-input:focus { box-shadow: 0 0 0 3px rgba(59,130,246,0.25); }
-
         .safe-top { padding-top: env(safe-area-inset-top); }
-        .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
-
         #fab-export { transition: all 0.25s cubic-bezier(.16,1,.3,1); }
         #fab-export:active { transform: scale(0.94); }
-
         thead th { position: sticky; top: 0; z-index: 10; }
-
         button { user-select: none; -webkit-user-select: none; }
-
         .bottom-bar { padding-bottom: max(0.75rem, env(safe-area-inset-bottom)); }
+        .save-pulse { animation: savePulse 0.5s ease; }
+        @keyframes savePulse { 0%,100% { opacity:1; } 50% { opacity:0.4; } }
+        #save-indicator { transition: opacity 0.4s ease; }
+        .restore-banner { animation: fadeIn 0.4s cubic-bezier(.16,1,.3,1); }
     </style>
 </head>
 <body class="font-body bg-slate-50 text-slate-900" style="height: auto; min-height: 100%;">
@@ -99,11 +88,11 @@
 <header class="bg-white border-b border-slate-200 shadow-custom sticky top-0 z-30 safe-top">
     <div class="max-w-screen-xl mx-auto px-4 sm:px-6 h-14 sm:h-16 flex items-center justify-between gap-3">
         <div class="flex items-center gap-2.5 flex-none">
-            <div class="flex-none">
-                <img src="logo.png" alt="Logo" class="h-10 w-10 sm:h-12 sm:w-12 object-contain rounded-small">
+            <div class="bg-blue-600 text-white p-1.5 sm:p-2 rounded-small flex-none">
+                <i data-lucide="library" class="w-4 h-4 sm:w-5 sm:h-5"></i>
             </div>
             <div>
-                <h1 class="font-heading text-base sm:text-lg font-bold text-slate-900 leading-tight">Vanna LibCheck</h1>
+                <h1 class="font-heading text-base sm:text-lg font-bold text-slate-900 leading-tight">LibCheck Pro</h1>
                 <p class="text-xs text-slate-400 hidden sm:block leading-none mt-0.5">Kiểm kê thư viện — Offline</p>
             </div>
         </div>
@@ -116,6 +105,11 @@
         </div>
 
         <div class="flex items-center gap-1.5 flex-none">
+            <!-- Auto-save indicator -->
+            <div id="save-indicator" class="hidden items-center gap-1.5 px-2 py-1 bg-emerald-50 rounded-small border border-emerald-200 opacity-0">
+                <i data-lucide="cloud-off" class="w-3 h-3 text-emerald-600"></i>
+                <span id="save-label" class="text-xs font-semibold text-emerald-700">Đã lưu</span>
+            </div>
             <button id="btn-reset" onclick="resetSystem()" class="hidden items-center gap-1 text-xs font-medium text-slate-500 hover:text-slate-700 px-2.5 py-2 rounded-small hover:bg-slate-100 transition-colors min-h-[44px]">
                 <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
                 <span class="hidden sm:inline">Làm mới</span>
@@ -127,6 +121,31 @@
         </div>
     </div>
 </header>
+
+<!-- RESTORE BANNER (shown when saved session found) -->
+<div id="restore-banner" class="hidden restore-banner bg-amber-50 border-b border-amber-200 px-4 sm:px-6 py-3">
+    <div class="max-w-screen-xl mx-auto flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        <div class="flex items-start gap-3">
+            <div class="w-8 h-8 bg-amber-100 rounded-small flex items-center justify-center flex-none mt-0.5">
+                <i data-lucide="history" class="w-4 h-4 text-amber-600"></i>
+            </div>
+            <div>
+                <p class="text-sm font-bold text-amber-900">Tìm thấy phiên kiểm kê chưa hoàn thành</p>
+                <p id="restore-meta" class="text-xs text-amber-700 mt-0.5">Lưu lúc: —</p>
+            </div>
+        </div>
+        <div class="flex gap-2 w-full sm:w-auto">
+            <button onclick="restoreSession()" class="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-sm font-bold rounded-small transition-colors min-h-[44px]">
+                <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+                Tiếp tục kiểm kê
+            </button>
+            <button onclick="dismissRestore()" class="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-2 bg-white hover:bg-amber-50 text-amber-700 text-sm font-semibold rounded-small border border-amber-300 transition-colors min-h-[44px]">
+                <i data-lucide="x" class="w-3.5 h-3.5"></i>
+                Bỏ qua
+            </button>
+        </div>
+    </div>
+</div>
 
 <!-- UPLOAD VIEW -->
 <div id="upload-view" class="flex items-center justify-center px-4 py-10 sm:py-16" style="min-height: calc(100vh - 56px);">
@@ -209,7 +228,6 @@
                     <i data-lucide="x" class="h-4 w-4"></i>
                 </button>
             </div>
-
             <div class="flex gap-2 flex-none">
                 <select id="status-filter" onchange="handleSearch()"
                     class="border border-slate-300 rounded-large text-sm px-3 py-2.5 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer min-h-[44px] flex-1 sm:flex-none">
@@ -288,12 +306,121 @@
 </script>
 
 <script>
+// ── CONSTANTS ──
+const STORAGE_KEY      = 'libcheck_session';
+const STORAGE_META_KEY = 'libcheck_meta';
+
 let inventoryData = [];
 let filteredIds   = [];
+let saveTimer     = null;
 
-document.addEventListener('DOMContentLoaded', () => { lucide.createIcons(); });
+// ── INIT ──
+document.addEventListener('DOMContentLoaded', () => {
+    lucide.createIcons();
+    checkForSavedSession();
+});
 
-// ── DRAG & DROP ──
+// ─────────────────────────────────────────────
+//  LOCAL STORAGE — SAVE / RESTORE / CLEAR
+// ─────────────────────────────────────────────
+
+function saveToStorage() {
+    try {
+        const meta = {
+            savedAt:   new Date().toISOString(),
+            total:     inventoryData.length,
+            checked:   inventoryData.filter(i => i.actualQty !== null).length,
+        };
+        localStorage.setItem(STORAGE_KEY,      JSON.stringify(inventoryData));
+        localStorage.setItem(STORAGE_META_KEY, JSON.stringify(meta));
+        showSaveIndicator();
+    } catch(e) {
+        // Storage full or unavailable — silently ignore
+        console.warn('LocalStorage save failed:', e);
+    }
+}
+
+// Debounced save — waits 600ms after last change
+function scheduleSave() {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(saveToStorage, 600);
+}
+
+function clearStorage() {
+    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(STORAGE_META_KEY);
+}
+
+function checkForSavedSession() {
+    try {
+        const raw  = localStorage.getItem(STORAGE_KEY);
+        const meta = localStorage.getItem(STORAGE_META_KEY);
+        if (!raw || !meta) return;
+
+        const parsed   = JSON.parse(meta);
+        const savedAt  = new Date(parsed.savedAt);
+        const dateStr  = savedAt.toLocaleDateString('vi-VN', { day:'2-digit', month:'2-digit', year:'numeric' });
+        const timeStr  = savedAt.toLocaleTimeString('vi-VN', { hour:'2-digit', minute:'2-digit' });
+
+        document.getElementById('restore-meta').textContent =
+            `Lưu lúc ${timeStr} ngày ${dateStr} · ${parsed.checked}/${parsed.total} đầu sách đã kiểm`;
+
+        document.getElementById('restore-banner').classList.remove('hidden');
+        lucide.createIcons({ nodes: [document.getElementById('restore-banner')] });
+    } catch(e) {
+        clearStorage();
+    }
+}
+
+function restoreSession() {
+    try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) { showToast('Không tìm thấy dữ liệu đã lưu.', 'error'); return; }
+
+        inventoryData = JSON.parse(raw);
+        filteredIds   = inventoryData.map(i => i.id);
+
+        document.getElementById('restore-banner').classList.add('hidden');
+        switchToDashboard();
+        renderAll();
+        updateStats();
+        showToast(`Đã khôi phục ${inventoryData.length} đầu sách!`, 'success');
+    } catch(e) {
+        showToast('Lỗi khôi phục dữ liệu. Vui lòng tải lại file.', 'error');
+        clearStorage();
+    }
+}
+
+function dismissRestore() {
+    document.getElementById('restore-banner').classList.add('hidden');
+    clearStorage();
+}
+
+// ── SAVE INDICATOR ──
+let hideIndicatorTimer = null;
+function showSaveIndicator() {
+    const el    = document.getElementById('save-indicator');
+    const label = document.getElementById('save-label');
+    el.classList.remove('hidden');
+    el.classList.add('flex');
+    el.style.opacity = '1';
+    label.textContent = 'Đã lưu';
+    el.classList.add('save-pulse');
+    setTimeout(() => el.classList.remove('save-pulse'), 500);
+
+    clearTimeout(hideIndicatorTimer);
+    hideIndicatorTimer = setTimeout(() => {
+        el.style.opacity = '0';
+        setTimeout(() => {
+            el.classList.add('hidden');
+            el.classList.remove('flex');
+        }, 400);
+    }, 2500);
+}
+
+// ─────────────────────────────────────────────
+//  DRAG & DROP
+// ─────────────────────────────────────────────
 function handleDragOver(e) { e.preventDefault(); document.getElementById('drop-zone').classList.add('drag-over'); }
 function handleDragLeave()  { document.getElementById('drop-zone').classList.remove('drag-over'); }
 function handleDrop(e) {
@@ -303,7 +430,9 @@ function handleDrop(e) {
     if (file) processFile(file);
 }
 
-// ── FILE UPLOAD ──
+// ─────────────────────────────────────────────
+//  FILE UPLOAD
+// ─────────────────────────────────────────────
 function handleFileUpload(event) {
     const file = event.target.files[0];
     if (file) processFile(file);
@@ -329,7 +458,9 @@ function processFile(file) {
     reader.readAsArrayBuffer(file);
 }
 
-// ── DEMO DATA ──
+// ─────────────────────────────────────────────
+//  DEMO DATA
+// ─────────────────────────────────────────────
 function loadDemoData() {
     const rows = [
         ['STT', 'Tên sách', 'Số lượng', 'SL Thực'],
@@ -353,29 +484,24 @@ function loadDemoData() {
     showToast('Đã tải dữ liệu mẫu!', 'success');
 }
 
-// ── PARSE ROWS ──
-// Detects header row, reads columns:
-//   [0] STT  [1] Tên sách  [2] SL hệ thống  [3] SL thực tế (optional)
+// ─────────────────────────────────────────────
+//  PARSE ROWS
+// ─────────────────────────────────────────────
 function parseAndLoad(rows) {
-    // Find header row index
     let headerIdx = 0;
     for (let i = 0; i < Math.min(rows.length, 15); i++) {
         const s = rows[i].join('|').toLowerCase();
         if (s.includes('tên') || s.includes('name') || s.includes('sách') || s.includes('title')) {
-            headerIdx = i;
-            break;
+            headerIdx = i; break;
         }
     }
 
-    // Detect which column index holds "SL thực tế" from the header row
-    // Default to column index 3 (D), but scan header for keywords
     let actualColIdx = 3;
-    const headerRow = rows[headerIdx] || [];
+    const headerRow  = rows[headerIdx] || [];
     for (let c = 0; c < headerRow.length; c++) {
         const h = String(headerRow[c]).toLowerCase();
         if (h.includes('thực') || h.includes('thuc') || h.includes('actual') || h.includes('real')) {
-            actualColIdx = c;
-            break;
+            actualColIdx = c; break;
         }
     }
 
@@ -384,13 +510,11 @@ function parseAndLoad(rows) {
     for (let i = headerIdx + 1; i < rows.length; i++) {
         const row = rows[i];
         if (!row || row.every(c => c === '' || c === null || c === undefined)) continue;
-
         const name = String(row[1] || '').trim();
         if (!name) continue;
 
-        // Parse actual qty — treat empty string / undefined as null (not yet entered)
         const rawActual = row[actualColIdx];
-        let actualQty = null;
+        let actualQty   = null;
         if (rawActual !== '' && rawActual !== null && rawActual !== undefined) {
             const parsed = parseInt(rawActual);
             if (!isNaN(parsed)) actualQty = Math.max(0, parsed);
@@ -412,12 +536,21 @@ function parseAndLoad(rows) {
     }
 
     filteredIds = inventoryData.map(i => i.id);
+
+    // Dismiss restore banner if visible (new file loaded)
+    document.getElementById('restore-banner').classList.add('hidden');
+
+    // Save immediately after loading
+    saveToStorage();
+
     switchToDashboard();
     renderAll();
     updateStats();
 }
 
-// ── VIEW SWITCH ──
+// ─────────────────────────────────────────────
+//  VIEW SWITCH
+// ─────────────────────────────────────────────
 function switchToDashboard() {
     document.getElementById('upload-view').classList.add('hidden');
     document.getElementById('dashboard-view').classList.remove('hidden');
@@ -428,7 +561,9 @@ function switchToDashboard() {
     lucide.createIcons();
 }
 
-// ── RENDER DESKTOP TABLE ──
+// ─────────────────────────────────────────────
+//  RENDER DESKTOP TABLE
+// ─────────────────────────────────────────────
 function renderDesktopTable() {
     const tbody   = document.getElementById('inventory-tbody');
     const empty   = document.getElementById('empty-state-desktop');
@@ -463,7 +598,9 @@ function renderDesktopTable() {
     tbody.appendChild(frag);
 }
 
-// ── RENDER MOBILE CARDS ──
+// ─────────────────────────────────────────────
+//  RENDER MOBILE CARDS
+// ─────────────────────────────────────────────
 function renderMobileCards() {
     const list    = document.getElementById('mobile-list');
     const empty   = document.getElementById('empty-state-mobile');
@@ -518,7 +655,9 @@ function renderMobileCards() {
     lucide.createIcons({ nodes: [list] });
 }
 
-// ── RENDER ALL ──
+// ─────────────────────────────────────────────
+//  RENDER ALL
+// ─────────────────────────────────────────────
 function renderAll() {
     const count = filteredIds.length;
     document.getElementById('result-count').textContent =
@@ -527,7 +666,9 @@ function renderAll() {
     renderMobileCards();
 }
 
-// ── QUANTITY UPDATE (no full re-render) ──
+// ─────────────────────────────────────────────
+//  QUANTITY UPDATE
+// ─────────────────────────────────────────────
 function updateQty(input) {
     const id   = parseInt(input.dataset.id);
     const val  = input.value.trim();
@@ -541,9 +682,7 @@ function updateQty(input) {
 
     // Update desktop row highlight
     const tr = document.querySelector(`#inventory-tbody tr[data-id="${id}"]`);
-    if (tr) {
-        tr.className = `hover:bg-slate-50/80 transition-colors ${isChecked ? 'bg-blue-50/30' : ''}`;
-    }
+    if (tr) tr.className = `hover:bg-slate-50/80 transition-colors ${isChecked ? 'bg-blue-50/30' : ''}`;
 
     // Update mobile card border + badge
     const card = document.querySelector(`#mobile-list [data-id="${id}"]`);
@@ -558,6 +697,9 @@ function updateQty(input) {
     }
 
     updateStats();
+
+    // Schedule debounced save
+    scheduleSave();
 }
 
 function handleQtyKey(event, input) {
@@ -570,7 +712,9 @@ function handleQtyKey(event, input) {
     }
 }
 
-// ── SEARCH & FILTER ──
+// ─────────────────────────────────────────────
+//  SEARCH & FILTER
+// ─────────────────────────────────────────────
 function handleSearch() {
     const q        = document.getElementById('search-input').value.toLowerCase().trim();
     const filter   = document.getElementById('status-filter').value;
@@ -584,8 +728,8 @@ function handleSearch() {
             const matchText   = !q || item.name.toLowerCase().includes(q) || String(item.stt).includes(q);
             const isChecked   = item.actualQty !== null;
             const matchStatus = filter === 'all'
-                || (filter === 'pending'  && !isChecked)
-                || (filter === 'checked'  &&  isChecked);
+                || (filter === 'pending' && !isChecked)
+                || (filter === 'checked' &&  isChecked);
             return matchText && matchStatus;
         })
         .map(i => i.id);
@@ -598,7 +742,9 @@ function clearSearch() {
     handleSearch();
 }
 
-// ── STATS ──
+// ─────────────────────────────────────────────
+//  STATS
+// ─────────────────────────────────────────────
 function updateStats() {
     const total     = inventoryData.length;
     const checked   = inventoryData.filter(i => i.actualQty !== null).length;
@@ -609,26 +755,20 @@ function updateStats() {
     document.getElementById('stat-checked').textContent   = checked;
     document.getElementById('stat-unchecked').textContent = unchecked;
     document.getElementById('stat-pct').textContent       = pct + '%';
-
     document.getElementById('progress-bar').style.width   = pct + '%';
     document.getElementById('progress-text').textContent  = pct + '%';
 }
 
-// ── EXPORT EXCEL ──
+// ─────────────────────────────────────────────
+//  EXPORT EXCEL
+// ─────────────────────────────────────────────
 function exportExcel() {
     if (typeof XLSX === 'undefined') { showToast('Thư viện xuất Excel chưa sẵn sàng. Thử lại sau vài giây.', 'error'); return; }
     if (inventoryData.length === 0)  { showToast('Không có dữ liệu để xuất.', 'error'); return; }
 
-    // Header row
     const wsData = [['STT', 'Tên Tài Liệu / Sách', 'Số Lượng Hệ Thống', 'Số Lượng Thực Tế']];
-
     inventoryData.forEach(item => {
-        wsData.push([
-            item.stt,
-            item.name,
-            item.sysQty,
-            item.actualQty !== null ? item.actualQty : '',
-        ]);
+        wsData.push([item.stt, item.name, item.sysQty, item.actualQty !== null ? item.actualQty : '']);
     });
 
     const ws = XLSX.utils.aoa_to_sheet(wsData);
@@ -645,22 +785,29 @@ function exportExcel() {
     showToast('Xuất file thành công!', 'success');
 }
 
-// ── RESET ──
+// ─────────────────────────────────────────────
+//  RESET
+// ─────────────────────────────────────────────
 function resetSystem() {
     if (!confirm('Làm mới sẽ xóa toàn bộ dữ liệu đang kiểm kê. Bạn có chắc không?')) return;
     inventoryData = [];
     filteredIds   = [];
+    clearStorage();
     document.getElementById('dashboard-view').classList.add('hidden');
     document.getElementById('upload-view').classList.remove('hidden');
     document.getElementById('header-progress').classList.add('hidden');
     document.getElementById('header-progress').classList.remove('flex');
     document.getElementById('btn-reset').classList.add('hidden');
     document.getElementById('btn-reset').classList.remove('flex');
+    document.getElementById('save-indicator').classList.add('hidden');
+    document.getElementById('save-indicator').classList.remove('flex');
     document.getElementById('file-upload').value = '';
     lucide.createIcons();
 }
 
-// ── TOAST ──
+// ─────────────────────────────────────────────
+//  TOAST
+// ─────────────────────────────────────────────
 function showToast(message, type = 'info') {
     const container = document.getElementById('toast-container');
     const colors = { success: 'bg-green-600', error: 'bg-red-600', info: 'bg-blue-600' };
@@ -673,7 +820,9 @@ function showToast(message, type = 'info') {
     setTimeout(() => el.remove(), 3200);
 }
 
-// ── UTILS ──
+// ─────────────────────────────────────────────
+//  UTILS
+// ─────────────────────────────────────────────
 function escHtml(str) {
     return String(str)
         .replace(/&/g, '&')
