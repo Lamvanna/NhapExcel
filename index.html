@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Hệ Thống Kiểm Kê Sách — Kiểm Kê Thư Viện</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+    <link id="heading-font-link" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link id="body-font-link" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        heading: ['var(--font-heading-name)', 'sans-serif'],
+                        body: ['var(--font-body-name)', 'sans-serif'],
+                    },
+                    borderRadius: {
+                        small: 'var(--radius-small)',
+                        large: 'var(--radius-large)',
+                    },
+                    boxShadow: {
+                        custom: 'var(--shadow-custom)',
+                        'custom-hover': 'var(--shadow-custom-hover)',
+                    },
+                }
+            }
+        }
+    </script>
+    <style>
+        :root {
+            --font-heading-name: 'Inter';
+            --font-body-name: 'Inter';
+            --font-heading: 'Inter', sans-serif;
+            --font-body: 'Inter', sans-serif;
+            --letter-spacing-heading: -0.02em;
+            --letter-spacing-body: 0px;
+            --space-base: 1rem;
+            --radius-small: 0.5rem;
+            --radius-large: 0.875rem;
+            --border-width: 1px;
+            --shadow-color: 15 23 42;
+            --shadow-offset-x: 0px;
+            --shadow-offset-y: 4px;
+            --shadow-blur: 16px;
+            --shadow-spread: -2px;
+            --shadow-opacity: 0.08;
+            --shadow-custom: 0 4px 16px -2px rgba(15,23,42,0.08), 0 2px 4px -1px rgba(15,23,42,0.04);
+            --shadow-custom-hover: 0 10px 24px -4px rgba(15,23,42,0.12), 0 4px 8px -2px rgba(15,23,42,0.06);
+        }
+
+        * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
+
+        ::-webkit-scrollbar { width: 5px; height: 5px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+        input[type=number]::-webkit-inner-spin-button,
+        input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+        input[type=number] { -moz-appearance: textfield; }
+
+        .fade-in { animation: fadeIn 0.35s cubic-bezier(.16,1,.3,1); }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+
+        .progress-bar { transition: width 0.6s cubic-bezier(.16,1,.3,1); }
+
+        .toast { animation: toastIn 0.35s cubic-bezier(.16,1,.3,1), toastOut 0.3s ease 2.7s forwards; }
+        @keyframes toastIn  { from { transform: translateX(110%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        @keyframes toastOut { from { opacity: 1; } to { opacity: 0; transform: translateY(-6px); } }
+
+        .drag-over { border-color: #3b82f6 !important; background-color: #eff6ff !important; }
+
+        .book-card { transition: box-shadow 0.2s ease, transform 0.15s ease; }
+        .book-card:active { transform: scale(0.99); }
+
+        .qty-input:focus { box-shadow: 0 0 0 3px rgba(59,130,246,0.25); }
+
+        .safe-top { padding-top: env(safe-area-inset-top); }
+        .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
+
+        #fab-export { transition: all 0.25s cubic-bezier(.16,1,.3,1); }
+        #fab-export:active { transform: scale(0.94); }
+
+        thead th { position: sticky; top: 0; z-index: 10; }
+
+        button { user-select: none; -webkit-user-select: none; }
+
+        .bottom-bar { padding-bottom: max(0.75rem, env(safe-area-inset-bottom)); }
+    </style>
+</head>
+<body class="font-body bg-slate-50 text-slate-900" style="height: auto; min-height: 100%;">
+
+<!-- Toast -->
+<div id="toast-container" class="fixed top-4 right-4 z-50 flex flex-col gap-2 pointer-events-none max-w-xs w-full"></div>
+
+<!-- HEADER -->
+<header class="bg-white border-b border-slate-200 shadow-custom sticky top-0 z-30 safe-top">
+    <div class="max-w-screen-xl mx-auto px-4 sm:px-6 h-14 sm:h-16 flex items-center justify-between gap-3">
+        <div class="flex items-center gap-2.5 flex-none">
+            <div class="flex-none">
+                <img src="logo.png" alt="Logo" class="h-10 w-10 sm:h-12 sm:w-12 object-contain rounded-small">
+            </div>
+            <div>
+                <h1 class="font-heading text-base sm:text-lg font-bold text-slate-900 leading-tight">Vanna LibCheck</h1>
+                <p class="text-xs text-slate-400 hidden sm:block leading-none mt-0.5">Kiểm kê thư viện — Offline</p>
+            </div>
+        </div>
+
+        <div id="header-progress" class="hidden items-center gap-2 flex-1 justify-center max-w-xs">
+            <div class="flex-1 bg-slate-200 rounded-full h-2">
+                <div id="progress-bar" class="bg-blue-500 h-2 rounded-full progress-bar" style="width:0%"></div>
+            </div>
+            <span id="progress-text" class="text-xs font-bold text-blue-600 w-8 text-right">0%</span>
+        </div>
+
+        <div class="flex items-center gap-1.5 flex-none">
+            <button id="btn-reset" onclick="resetSystem()" class="hidden items-center gap-1 text-xs font-medium text-slate-500 hover:text-slate-700 px-2.5 py-2 rounded-small hover:bg-slate-100 transition-colors min-h-[44px]">
+                <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
+                <span class="hidden sm:inline">Làm mới</span>
+            </button>
+            <div class="flex items-center gap-1.5 px-2 py-1 bg-green-50 rounded-small border border-green-200">
+                <span class="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
+                <span class="text-xs font-semibold text-green-700">Offline</span>
+            </div>
+        </div>
+    </div>
+</header>
+
+<!-- UPLOAD VIEW -->
+<div id="upload-view" class="flex items-center justify-center px-4 py-10 sm:py-16" style="min-height: calc(100vh - 56px);">
+    <div class="bg-white rounded-large shadow-custom border border-slate-200 w-full max-w-md p-6 sm:p-8 fade-in">
+        <div class="text-center mb-7">
+            <div class="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                <i data-lucide="upload-cloud" class="w-8 h-8 text-blue-600"></i>
+            </div>
+            <h2 class="font-heading text-xl sm:text-2xl font-bold text-slate-900 mb-2">Bắt đầu kiểm kê</h2>
+            <p class="text-slate-500 text-sm leading-relaxed">Tải lên file Excel danh sách sách. Toàn bộ xử lý diễn ra trên thiết bị của bạn — không cần Internet.</p>
+        </div>
+
+        <label id="drop-zone" for="file-upload"
+            class="flex flex-col items-center justify-center w-full border-2 border-dashed border-slate-300 rounded-large cursor-pointer hover:border-blue-500 hover:bg-blue-50 active:bg-blue-100 transition-all group py-8 px-4"
+            ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event)">
+            <i data-lucide="file-spreadsheet" class="w-9 h-9 text-slate-400 group-hover:text-blue-500 mb-3 transition-colors"></i>
+            <p class="text-sm font-semibold text-slate-600 group-hover:text-blue-600 transition-colors text-center">
+                <span class="hidden sm:inline">Kéo thả file vào đây hoặc </span>
+                <span class="text-blue-600 underline underline-offset-2">Chọn file Excel</span>
+            </p>
+            <p class="text-xs text-slate-400 mt-1.5">Hỗ trợ .xlsx · .xls</p>
+            <input id="file-upload" type="file" class="hidden" accept=".xlsx,.xls" onchange="handleFileUpload(event)">
+        </label>
+
+        <div class="mt-4 bg-amber-50 border border-amber-200 rounded-large p-3.5">
+            <div class="flex gap-2.5">
+                <i data-lucide="info" class="w-4 h-4 text-amber-600 flex-none mt-0.5"></i>
+                <div>
+                    <p class="text-xs font-bold text-amber-800 mb-1">Định dạng cột Excel cần có:</p>
+                    <p class="text-xs text-amber-700 font-mono bg-amber-100 rounded px-2 py-1">Cột A: STT &nbsp;|&nbsp; Cột B: Tên sách &nbsp;|&nbsp; Cột C: Số lượng &nbsp;|&nbsp; Cột D: SL Thực (tuỳ chọn)</p>
+                    <p class="text-xs text-amber-600 mt-1.5">Hệ thống tự bỏ qua dòng tiêu đề. Nếu cột D đã có dữ liệu sẽ được tự động điền vào.</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-5 pt-5 border-t border-slate-100 text-center">
+            <button onclick="loadDemoData()" class="text-sm text-blue-600 hover:text-blue-700 font-semibold hover:underline underline-offset-2 transition-colors min-h-[44px] px-4">
+                Dùng thử với 15 cuốn sách mẫu →
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- DASHBOARD VIEW -->
+<div id="dashboard-view" class="hidden">
+
+    <!-- Stats Bar -->
+    <div class="bg-white border-b border-slate-200 px-4 sm:px-6 py-3 sm:py-4">
+        <div class="max-w-screen-xl mx-auto grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
+            <div class="bg-slate-50 rounded-large p-3 sm:p-4 border border-slate-200 col-span-2 sm:col-span-1">
+                <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Tổng đầu sách</p>
+                <p id="stat-total" class="font-heading text-2xl sm:text-3xl font-extrabold text-slate-900">0</p>
+            </div>
+            <div class="bg-blue-50 rounded-large p-3 sm:p-4 border border-blue-100">
+                <p class="text-xs font-bold text-blue-500 uppercase tracking-wider mb-1">Đã kiểm</p>
+                <p id="stat-checked" class="font-heading text-2xl sm:text-3xl font-extrabold text-blue-700">0</p>
+            </div>
+            <div class="bg-slate-50 rounded-large p-3 sm:p-4 border border-slate-200">
+                <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Chưa kiểm</p>
+                <p id="stat-unchecked" class="font-heading text-2xl sm:text-3xl font-extrabold text-slate-500">0</p>
+            </div>
+            <div class="bg-green-50 rounded-large p-3 sm:p-4 border border-green-100">
+                <p class="text-xs font-bold text-green-500 uppercase tracking-wider mb-1">Hoàn thành</p>
+                <p id="stat-pct" class="font-heading text-2xl sm:text-3xl font-extrabold text-green-700">0%</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toolbar -->
+    <div class="bg-white border-b border-slate-200 px-4 sm:px-6 py-3 sticky top-14 sm:top-16 z-20 shadow-sm">
+        <div class="max-w-screen-xl mx-auto flex flex-col sm:flex-row gap-2 sm:gap-3 items-stretch sm:items-center justify-between">
+            <div class="relative flex-1">
+                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <i data-lucide="search" class="h-4 w-4 text-slate-400"></i>
+                </div>
+                <input type="text" id="search-input" oninput="handleSearch()" inputmode="search"
+                    class="block w-full pl-9 pr-9 py-2.5 sm:py-3 border border-slate-300 rounded-large text-sm bg-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow min-h-[44px]"
+                    placeholder="Tìm tên sách, STT...">
+                <button id="clear-search" onclick="clearSearch()" class="hidden absolute inset-y-0 right-0 pr-3 items-center text-slate-400 hover:text-slate-600 min-w-[44px] justify-center">
+                    <i data-lucide="x" class="h-4 w-4"></i>
+                </button>
+            </div>
+
+            <div class="flex gap-2 flex-none">
+                <select id="status-filter" onchange="handleSearch()"
+                    class="border border-slate-300 rounded-large text-sm px-3 py-2.5 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer min-h-[44px] flex-1 sm:flex-none">
+                    <option value="all">Tất cả</option>
+                    <option value="pending">Chưa kiểm</option>
+                    <option value="checked">Đã kiểm</option>
+                </select>
+                <button onclick="exportExcel()"
+                    class="hidden sm:inline-flex items-center gap-2 px-4 py-2.5 bg-green-600 hover:bg-green-700 active:bg-green-800 text-white text-sm font-bold rounded-large shadow-sm transition-colors min-h-[44px]">
+                    <i data-lucide="download" class="w-4 h-4"></i>
+                    <span>Xuất Excel</span>
+                </button>
+            </div>
+        </div>
+        <div class="max-w-screen-xl mx-auto mt-1.5">
+            <p id="result-count" class="text-xs text-slate-400"></p>
+        </div>
+    </div>
+
+    <!-- DESKTOP TABLE -->
+    <div class="hidden sm:block max-w-screen-xl mx-auto px-4 sm:px-6 py-4 pb-8">
+        <div class="bg-white rounded-large shadow-custom border border-slate-200 overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-slate-200">
+                    <thead class="bg-slate-50">
+                        <tr>
+                            <th class="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider w-16 bg-slate-50">STT</th>
+                            <th class="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider bg-slate-50">Tên Tài Liệu / Sách</th>
+                            <th class="px-4 py-3 text-center text-xs font-bold text-slate-500 uppercase tracking-wider w-36 bg-slate-50">SL Hệ Thống</th>
+                            <th class="px-4 py-3 text-center text-xs font-bold text-slate-500 uppercase tracking-wider w-40 bg-slate-50">SL Thực Tế</th>
+                        </tr>
+                    </thead>
+                    <tbody id="inventory-tbody" class="bg-white divide-y divide-slate-100"></tbody>
+                </table>
+            </div>
+            <div id="empty-state-desktop" class="hidden py-16 text-center">
+                <div class="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <i data-lucide="search-x" class="w-6 h-6 text-slate-400"></i>
+                </div>
+                <h3 class="text-sm font-semibold text-slate-700">Không tìm thấy kết quả</h3>
+                <p class="text-xs text-slate-400 mt-1">Thử từ khóa khác hoặc xóa bộ lọc.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- MOBILE CARD LIST -->
+    <div class="sm:hidden px-4 py-3 pb-28" id="mobile-list"></div>
+    <div id="empty-state-mobile" class="sm:hidden hidden py-16 text-center px-4">
+        <div class="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-3">
+            <i data-lucide="search-x" class="w-6 h-6 text-slate-400"></i>
+        </div>
+        <h3 class="text-sm font-semibold text-slate-700">Không tìm thấy kết quả</h3>
+        <p class="text-xs text-slate-400 mt-1">Thử từ khóa khác hoặc xóa bộ lọc.</p>
+    </div>
+
+    <!-- FAB Export (mobile only) -->
+    <button id="fab-export" onclick="exportExcel()"
+        class="sm:hidden fixed bottom-6 right-4 z-40 flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white font-bold text-sm px-5 py-3.5 rounded-full shadow-custom-hover bottom-bar">
+        <i data-lucide="download" class="w-4 h-4"></i>
+        Xuất Excel
+    </button>
+</div>
+
+<!-- SheetJS -->
+<script>
+(function loadSheetJS() {
+    const s = document.createElement('script');
+    s.src = 'https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js';
+    s.onerror = function() {
+        const s2 = document.createElement('script');
+        s2.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+        document.head.appendChild(s2);
+    };
+    document.head.appendChild(s);
+})();
+</script>
+
+<script>
+let inventoryData = [];
+let filteredIds   = [];
+
+document.addEventListener('DOMContentLoaded', () => { lucide.createIcons(); });
+
+// ── DRAG & DROP ──
+function handleDragOver(e) { e.preventDefault(); document.getElementById('drop-zone').classList.add('drag-over'); }
+function handleDragLeave()  { document.getElementById('drop-zone').classList.remove('drag-over'); }
+function handleDrop(e) {
+    e.preventDefault();
+    document.getElementById('drop-zone').classList.remove('drag-over');
+    const file = e.dataTransfer.files[0];
+    if (file) processFile(file);
+}
+
+// ── FILE UPLOAD ──
+function handleFileUpload(event) {
+    const file = event.target.files[0];
+    if (file) processFile(file);
+}
+
+function processFile(file) {
+    if (!file.name.match(/\.(xlsx|xls)$/i)) { showToast('Vui lòng chọn file .xlsx hoặc .xls', 'error'); return; }
+    showToast('Đang đọc file...', 'info');
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            const data     = new Uint8Array(e.target.result);
+            const workbook = XLSX.read(data, { type: 'array' });
+            const sheet    = workbook.Sheets[workbook.SheetNames[0]];
+            const rawRows  = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+            parseAndLoad(rawRows);
+            showToast('Tải file thành công!', 'success');
+        } catch(err) {
+            showToast('Lỗi đọc file. Kiểm tra lại định dạng.', 'error');
+            console.error(err);
+        }
+    };
+    reader.readAsArrayBuffer(file);
+}
+
+// ── DEMO DATA ──
+function loadDemoData() {
+    const rows = [
+        ['STT', 'Tên sách', 'Số lượng', 'SL Thực'],
+        [1,  'Đắc Nhân Tâm - Dale Carnegie',                5,  3],
+        [2,  'Nhà Giả Kim - Paulo Coelho',                  3,  ''],
+        [3,  'Tuổi Trẻ Đáng Giá Bao Nhiêu - Rosie Nguyễn', 10, 10],
+        [4,  'Harry Potter và Hòn Đá Phù Thủy',             2,  ''],
+        [5,  'Lược Sử Loài Người - Yuval Noah Harari',      7,  8],
+        [6,  'Cà Phê Cùng Tony - Tony Buổi Sáng',           12, ''],
+        [7,  'Mắt Biếc - Nguyễn Nhật Ánh',                  4,  4],
+        [8,  'Tôi Thấy Hoa Vàng Trên Cỏ Xanh',              6,  ''],
+        [9,  'Dế Mèn Phiêu Lưu Ký - Tô Hoài',               15, 14],
+        [10, 'Số Đỏ - Vũ Trọng Phụng',                      8,  ''],
+        [11, 'Tắt Đèn - Ngô Tất Tố',                        5,  5],
+        [12, 'Chí Phèo - Nam Cao',                           9,  ''],
+        [13, 'Rừng Na Uy - Haruki Murakami',                 3,  3],
+        [14, 'Đồi Gió Hú - Emily Brontë',                   4,  ''],
+        [15, 'Bố Già - Mario Puzo',                          6,  7],
+    ];
+    parseAndLoad(rows);
+    showToast('Đã tải dữ liệu mẫu!', 'success');
+}
+
+// ── PARSE ROWS ──
+// Detects header row, reads columns:
+//   [0] STT  [1] Tên sách  [2] SL hệ thống  [3] SL thực tế (optional)
+function parseAndLoad(rows) {
+    // Find header row index
+    let headerIdx = 0;
+    for (let i = 0; i < Math.min(rows.length, 15); i++) {
+        const s = rows[i].join('|').toLowerCase();
+        if (s.includes('tên') || s.includes('name') || s.includes('sách') || s.includes('title')) {
+            headerIdx = i;
+            break;
+        }
+    }
+
+    // Detect which column index holds "SL thực tế" from the header row
+    // Default to column index 3 (D), but scan header for keywords
+    let actualColIdx = 3;
+    const headerRow = rows[headerIdx] || [];
+    for (let c = 0; c < headerRow.length; c++) {
+        const h = String(headerRow[c]).toLowerCase();
+        if (h.includes('thực') || h.includes('thuc') || h.includes('actual') || h.includes('real')) {
+            actualColIdx = c;
+            break;
+        }
+    }
+
+    inventoryData = [];
+    let counter = 1;
+    for (let i = headerIdx + 1; i < rows.length; i++) {
+        const row = rows[i];
+        if (!row || row.every(c => c === '' || c === null || c === undefined)) continue;
+
+        const name = String(row[1] || '').trim();
+        if (!name) continue;
+
+        // Parse actual qty — treat empty string / undefined as null (not yet entered)
+        const rawActual = row[actualColIdx];
+        let actualQty = null;
+        if (rawActual !== '' && rawActual !== null && rawActual !== undefined) {
+            const parsed = parseInt(rawActual);
+            if (!isNaN(parsed)) actualQty = Math.max(0, parsed);
+        }
+
+        inventoryData.push({
+            id:        i,
+            stt:       (row[0] !== '' && row[0] !== undefined) ? row[0] : counter,
+            name:      name,
+            sysQty:    parseInt(row[2]) || 0,
+            actualQty: actualQty,
+        });
+        counter++;
+    }
+
+    if (inventoryData.length === 0) {
+        showToast('Không tìm thấy dữ liệu. Kiểm tra lại định dạng file.', 'error');
+        return;
+    }
+
+    filteredIds = inventoryData.map(i => i.id);
+    switchToDashboard();
+    renderAll();
+    updateStats();
+}
+
+// ── VIEW SWITCH ──
+function switchToDashboard() {
+    document.getElementById('upload-view').classList.add('hidden');
+    document.getElementById('dashboard-view').classList.remove('hidden');
+    document.getElementById('header-progress').classList.remove('hidden');
+    document.getElementById('header-progress').classList.add('flex');
+    document.getElementById('btn-reset').classList.remove('hidden');
+    document.getElementById('btn-reset').classList.add('flex');
+    lucide.createIcons();
+}
+
+// ── RENDER DESKTOP TABLE ──
+function renderDesktopTable() {
+    const tbody   = document.getElementById('inventory-tbody');
+    const empty   = document.getElementById('empty-state-desktop');
+    const visible = inventoryData.filter(item => filteredIds.includes(item.id));
+
+    tbody.innerHTML = '';
+    if (visible.length === 0) { empty.classList.remove('hidden'); return; }
+    empty.classList.add('hidden');
+
+    const frag = document.createDocumentFragment();
+    visible.forEach(item => {
+        const isChecked = item.actualQty !== null;
+        const tr = document.createElement('tr');
+        tr.className = `hover:bg-slate-50/80 transition-colors ${isChecked ? 'bg-blue-50/30' : ''}`;
+        tr.dataset.id = item.id;
+        tr.innerHTML = `
+            <td class="px-4 py-3 text-sm text-slate-400 font-semibold whitespace-nowrap">${item.stt}</td>
+            <td class="px-4 py-3 text-sm text-slate-800 font-medium">
+                <span title="${escHtml(item.name)}">${escHtml(item.name)}</span>
+            </td>
+            <td class="px-4 py-3 text-sm text-slate-600 text-center font-bold">${item.sysQty}</td>
+            <td class="px-4 py-3 text-center">
+                <input type="number" min="0" inputmode="numeric" data-id="${item.id}"
+                    value="${item.actualQty !== null ? item.actualQty : ''}"
+                    placeholder="Nhập..."
+                    class="qty-input w-28 text-center border border-slate-300 rounded-small py-2 px-2 text-sm font-bold text-slate-900 placeholder-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-shadow bg-white"
+                    onchange="updateQty(this)" onkeydown="handleQtyKey(event,this)">
+            </td>
+        `;
+        frag.appendChild(tr);
+    });
+    tbody.appendChild(frag);
+}
+
+// ── RENDER MOBILE CARDS ──
+function renderMobileCards() {
+    const list    = document.getElementById('mobile-list');
+    const empty   = document.getElementById('empty-state-mobile');
+    const visible = inventoryData.filter(item => filteredIds.includes(item.id));
+
+    list.innerHTML = '';
+    if (visible.length === 0) { empty.classList.remove('hidden'); return; }
+    empty.classList.add('hidden');
+
+    const frag = document.createDocumentFragment();
+    visible.forEach(item => {
+        const isChecked = item.actualQty !== null;
+        const card = document.createElement('div');
+        card.className = `book-card bg-white rounded-large border ${isChecked ? 'border-blue-200' : 'border-slate-200'} shadow-sm mb-3 overflow-hidden`;
+        card.dataset.id = item.id;
+        card.innerHTML = `
+            <div class="px-4 pt-3.5 pb-3">
+                <div class="flex items-start justify-between gap-2 mb-3">
+                    <div class="flex-1 min-w-0">
+                        <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">STT ${item.stt}</span>
+                        <p class="text-sm font-bold text-slate-900 mt-0.5 leading-snug">${escHtml(item.name)}</p>
+                    </div>
+                    <div class="flex-none mt-0.5">
+                        ${isChecked
+                            ? `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-blue-100 text-blue-700">✓ Đã kiểm</span>`
+                            : `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-slate-100 text-slate-500">— Chưa kiểm</span>`
+                        }
+                    </div>
+                </div>
+                <div class="flex items-center gap-3">
+                    <div class="flex-1 bg-slate-50 rounded-small px-3 py-2.5 text-center border border-slate-200">
+                        <p class="text-xs text-slate-400 font-semibold mb-0.5">Hệ thống</p>
+                        <p class="text-xl font-extrabold text-slate-700">${item.sysQty}</p>
+                    </div>
+                    <div class="flex-none text-slate-300">
+                        <i data-lucide="arrow-right" class="w-4 h-4"></i>
+                    </div>
+                    <div class="flex-1 text-center">
+                        <p class="text-xs text-blue-500 font-bold mb-0.5">Thực tế</p>
+                        <input type="number" min="0" inputmode="numeric" data-id="${item.id}"
+                            value="${item.actualQty !== null ? item.actualQty : ''}"
+                            placeholder="—"
+                            class="qty-input w-full text-center border-2 border-blue-300 rounded-small py-1.5 px-2 text-xl font-extrabold text-blue-700 placeholder-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-shadow bg-blue-50"
+                            onchange="updateQty(this)" onkeydown="handleQtyKey(event,this)">
+                    </div>
+                </div>
+            </div>
+        `;
+        frag.appendChild(card);
+    });
+    list.appendChild(frag);
+    lucide.createIcons({ nodes: [list] });
+}
+
+// ── RENDER ALL ──
+function renderAll() {
+    const count = filteredIds.length;
+    document.getElementById('result-count').textContent =
+        `Hiển thị ${count} / ${inventoryData.length} đầu sách`;
+    renderDesktopTable();
+    renderMobileCards();
+}
+
+// ── QUANTITY UPDATE (no full re-render) ──
+function updateQty(input) {
+    const id   = parseInt(input.dataset.id);
+    const val  = input.value.trim();
+    const item = inventoryData.find(i => i.id === id);
+    if (!item) return;
+
+    item.actualQty = val === '' ? null : Math.max(0, parseInt(val) || 0);
+    if (val !== '' && parseInt(val) < 0) { item.actualQty = 0; input.value = 0; }
+
+    const isChecked = item.actualQty !== null;
+
+    // Update desktop row highlight
+    const tr = document.querySelector(`#inventory-tbody tr[data-id="${id}"]`);
+    if (tr) {
+        tr.className = `hover:bg-slate-50/80 transition-colors ${isChecked ? 'bg-blue-50/30' : ''}`;
+    }
+
+    // Update mobile card border + badge
+    const card = document.querySelector(`#mobile-list [data-id="${id}"]`);
+    if (card) {
+        card.className = `book-card bg-white rounded-large border ${isChecked ? 'border-blue-200' : 'border-slate-200'} shadow-sm mb-3 overflow-hidden`;
+        const badgeEl = card.querySelector('.flex-none.mt-0\\.5');
+        if (badgeEl) {
+            badgeEl.innerHTML = isChecked
+                ? `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-blue-100 text-blue-700">✓ Đã kiểm</span>`
+                : `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-slate-100 text-slate-500">— Chưa kiểm</span>`;
+        }
+    }
+
+    updateStats();
+}
+
+function handleQtyKey(event, input) {
+    if (event.key === 'Enter') {
+        event.preventDefault();
+        const all = Array.from(document.querySelectorAll('.qty-input'));
+        const idx = all.indexOf(input);
+        if (idx >= 0 && idx < all.length - 1) { all[idx + 1].focus(); all[idx + 1].select(); }
+        else { input.blur(); }
+    }
+}
+
+// ── SEARCH & FILTER ──
+function handleSearch() {
+    const q        = document.getElementById('search-input').value.toLowerCase().trim();
+    const filter   = document.getElementById('status-filter').value;
+    const clearBtn = document.getElementById('clear-search');
+
+    clearBtn.classList.toggle('hidden', q === '');
+    clearBtn.classList.toggle('flex',   q !== '');
+
+    filteredIds = inventoryData
+        .filter(item => {
+            const matchText   = !q || item.name.toLowerCase().includes(q) || String(item.stt).includes(q);
+            const isChecked   = item.actualQty !== null;
+            const matchStatus = filter === 'all'
+                || (filter === 'pending'  && !isChecked)
+                || (filter === 'checked'  &&  isChecked);
+            return matchText && matchStatus;
+        })
+        .map(i => i.id);
+
+    renderAll();
+}
+
+function clearSearch() {
+    document.getElementById('search-input').value = '';
+    handleSearch();
+}
+
+// ── STATS ──
+function updateStats() {
+    const total     = inventoryData.length;
+    const checked   = inventoryData.filter(i => i.actualQty !== null).length;
+    const unchecked = total - checked;
+    const pct       = total > 0 ? Math.round((checked / total) * 100) : 0;
+
+    document.getElementById('stat-total').textContent     = total;
+    document.getElementById('stat-checked').textContent   = checked;
+    document.getElementById('stat-unchecked').textContent = unchecked;
+    document.getElementById('stat-pct').textContent       = pct + '%';
+
+    document.getElementById('progress-bar').style.width   = pct + '%';
+    document.getElementById('progress-text').textContent  = pct + '%';
+}
+
+// ── EXPORT EXCEL ──
+function exportExcel() {
+    if (typeof XLSX === 'undefined') { showToast('Thư viện xuất Excel chưa sẵn sàng. Thử lại sau vài giây.', 'error'); return; }
+    if (inventoryData.length === 0)  { showToast('Không có dữ liệu để xuất.', 'error'); return; }
+
+    // Header row
+    const wsData = [['STT', 'Tên Tài Liệu / Sách', 'Số Lượng Hệ Thống', 'Số Lượng Thực Tế']];
+
+    inventoryData.forEach(item => {
+        wsData.push([
+            item.stt,
+            item.name,
+            item.sysQty,
+            item.actualQty !== null ? item.actualQty : '',
+        ]);
+    });
+
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+    ws['!cols'] = [{ wch: 6 }, { wch: 55 }, { wch: 20 }, { wch: 20 }];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'KiemKe');
+
+    const now = new Date();
+    const pad = n => String(n).padStart(2, '0');
+    const ts  = `${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}`;
+
+    XLSX.writeFile(wb, `KiemKeThuVien_${ts}.xlsx`);
+    showToast('Xuất file thành công!', 'success');
+}
+
+// ── RESET ──
+function resetSystem() {
+    if (!confirm('Làm mới sẽ xóa toàn bộ dữ liệu đang kiểm kê. Bạn có chắc không?')) return;
+    inventoryData = [];
+    filteredIds   = [];
+    document.getElementById('dashboard-view').classList.add('hidden');
+    document.getElementById('upload-view').classList.remove('hidden');
+    document.getElementById('header-progress').classList.add('hidden');
+    document.getElementById('header-progress').classList.remove('flex');
+    document.getElementById('btn-reset').classList.add('hidden');
+    document.getElementById('btn-reset').classList.remove('flex');
+    document.getElementById('file-upload').value = '';
+    lucide.createIcons();
+}
+
+// ── TOAST ──
+function showToast(message, type = 'info') {
+    const container = document.getElementById('toast-container');
+    const colors = { success: 'bg-green-600', error: 'bg-red-600', info: 'bg-blue-600' };
+    const icons  = { success: 'check-circle', error: 'alert-circle', info: 'info' };
+    const el = document.createElement('div');
+    el.className = `toast pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-large shadow-custom-hover text-white text-sm font-semibold ${colors[type] || colors.info}`;
+    el.innerHTML = `<i data-lucide="${icons[type]}" class="w-4 h-4 flex-none"></i><span>${message}</span>`;
+    container.appendChild(el);
+    lucide.createIcons({ nodes: [el] });
+    setTimeout(() => el.remove(), 3200);
+}
+
+// ── UTILS ──
+function escHtml(str) {
+    return String(str)
+        .replace(/&/g, '&')
+        .replace(/</g, '<')
+        .replace(/>/g, '>')
+        .replace(/"/g, '"');
+}
+</script>
+</body>
+</html>
